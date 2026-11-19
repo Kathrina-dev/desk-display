@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../services/desk_timer_service.dart';
@@ -89,8 +90,8 @@ class _ClockPage extends StatelessWidget {
         Positioned(
           right: 24,
           bottom: 18,
-          child: GestureDetector(
-            onLongPress: onEmergencyExit,
+          child: _EmergencyUnlock(
+            onUnlock: onEmergencyExit,
             child: Text(
               'DESK ${hours}h ${minutes.toString().padLeft(2, '0')}m',
               style: const TextStyle(color: Color(0x66F2F2F2), fontSize: 12, letterSpacing: 1.5),
@@ -98,6 +99,45 @@ class _ClockPage extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _EmergencyUnlock extends StatefulWidget {
+  const _EmergencyUnlock({required this.onUnlock, required this.child});
+
+  final Future<void> Function() onUnlock;
+  final Widget child;
+
+  @override
+  State<_EmergencyUnlock> createState() => _EmergencyUnlockState();
+}
+
+class _EmergencyUnlockState extends State<_EmergencyUnlock> {
+  Timer? _holdTimer;
+
+  void _startHold(LongPressStartDetails details) {
+    _holdTimer = Timer(const Duration(seconds: 4), widget.onUnlock);
+  }
+
+  void _cancelHold([LongPressEndDetails? details]) {
+    _holdTimer?.cancel();
+    _holdTimer = null;
+  }
+
+  @override
+  void dispose() {
+    _cancelHold();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onLongPressStart: _startHold,
+      onLongPressEnd: _cancelHold,
+      onLongPressCancel: _cancelHold,
+      child: widget.child,
     );
   }
 }
