@@ -32,49 +32,71 @@ class _FlipClockState extends State<FlipClock> {
   Widget build(BuildContext context) {
     final hour = _now.hour.toString().padLeft(2, '0');
     final minute = _now.minute.toString().padLeft(2, '0');
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _FlipPair(value: hour),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14),
-          child: Text(':', style: TextStyle(fontSize: 64, color: Color(0xFFC44582))),
-        ),
-        _FlipPair(value: minute),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final digitWidth = ((constraints.maxWidth - 80) / 4).clamp(54.0, 220.0);
+        final digitHeight = (constraints.maxHeight * 0.82)
+            .clamp(92.0, digitWidth / 0.72);
+        final separatorSize = digitHeight * 0.54;
+        return Center(
+          child: FittedBox(
+            fit: BoxFit.contain,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _FlipPair(value: hour, width: digitWidth, height: digitHeight),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: digitWidth * 0.08),
+                  child: Text(':', style: TextStyle(
+                    fontSize: separatorSize,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFFC44582),
+                    height: 1,
+                  )),
+                ),
+                _FlipPair(value: minute, width: digitWidth, height: digitHeight),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
 
 class _FlipPair extends StatelessWidget {
-  const _FlipPair({required this.value});
+  const _FlipPair({required this.value, required this.width, required this.height});
 
   final String value;
+  final double width;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _FlipDigit(value: value[0]),
-        const SizedBox(width: 8),
-        _FlipDigit(value: value[1]),
+        _FlipDigit(value: value[0], width: width, height: height),
+        SizedBox(width: width * 0.08),
+        _FlipDigit(value: value[1], width: width, height: height),
       ],
     );
   }
 }
 
 class _FlipDigit extends StatelessWidget {
-  const _FlipDigit({required this.value});
+  const _FlipDigit({required this.value, required this.width, required this.height});
 
   final String value;
+  final double width;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 92,
-      height: 128,
+      width: width,
+      height: height,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(width * 0.08),
         child: DecoratedBox(
           decoration: const BoxDecoration(color: Color(0xFF141414)),
           child: Stack(
@@ -93,8 +115,9 @@ class _FlipDigit extends StatelessWidget {
                       return Transform(alignment: Alignment.center, transform: transform, child: child);
                     },
                   ),
-                  child: Text(value, key: ValueKey(value), style: const TextStyle(
-                    color: Color(0xFFF2F2F2), fontSize: 92, fontWeight: FontWeight.w300, height: 1,
+                  child: Text(value, key: ValueKey(value), style: TextStyle(
+                    color: Color(0xFFF2F2F2), fontSize: height * 0.72,
+                    fontWeight: FontWeight.w900, height: 1,
                   )),
                 ),
               ),
