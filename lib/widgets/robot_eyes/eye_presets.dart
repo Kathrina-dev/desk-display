@@ -1,4 +1,11 @@
+import 'package:flutter/material.dart';
 import 'face_emotions.dart';
+
+enum MouthShape {
+  line,
+  uprightTriangle,
+  invertedTriangle,
+}
 
 class EyeConfig {
   const EyeConfig({
@@ -7,6 +14,9 @@ class EyeConfig {
     required this.borderRadius,
     required this.topSlope,
     required this.bottomSlope,
+    required this.color,
+    this.mouthWidth = 42,
+    this.mouthShape = MouthShape.line,
     this.offsetX = 0,
     this.offsetY = 0,
     this.isAsymmetric = false,
@@ -17,6 +27,9 @@ class EyeConfig {
   final double borderRadius;
   final double topSlope;
   final double bottomSlope;
+  final Color color;
+  final double mouthWidth;
+  final MouthShape mouthShape;
   final double offsetX;
   final double offsetY;
   final bool isAsymmetric;
@@ -27,6 +40,9 @@ class EyeConfig {
         borderRadius: _lerp(borderRadius, other.borderRadius, t),
         topSlope: _lerp(topSlope, other.topSlope, t),
         bottomSlope: _lerp(bottomSlope, other.bottomSlope, t),
+        color: Color.lerp(color, other.color, t) ?? other.color,
+        mouthWidth: _lerp(mouthWidth, other.mouthWidth, t),
+        mouthShape: t > 0.35 ? other.mouthShape : mouthShape,
         offsetX: _lerp(offsetX, other.offsetX, t),
         offsetY: _lerp(offsetY, other.offsetY, t),
         isAsymmetric: other.isAsymmetric,
@@ -36,24 +52,217 @@ class EyeConfig {
 }
 
 class EyePresets {
-  static const normal = EyeConfig(width: 40, height: 40, borderRadius: 8, topSlope: 0, bottomSlope: 0);
-  static const happy = EyeConfig(width: 40, height: 10, borderRadius: 6, topSlope: 0, bottomSlope: 0);
-  static const glee = EyeConfig(width: 40, height: 8, borderRadius: 5, topSlope: 0, bottomSlope: 0);
-  static const sad = EyeConfig(width: 40, height: 15, borderRadius: 5, topSlope: -0.5, bottomSlope: 0);
-  static const worried = EyeConfig(width: 40, height: 25, borderRadius: 8, topSlope: -0.1, bottomSlope: 0);
-  static const focused = EyeConfig(width: 40, height: 14, borderRadius: 3, topSlope: 0.2, bottomSlope: 0);
-  static const annoyed = EyeConfig(width: 40, height: 12, borderRadius: 5, topSlope: 0, bottomSlope: 0);
-  static const surprised = EyeConfig(width: 45, height: 45, borderRadius: 16, topSlope: 0, bottomSlope: 0, offsetX: -2);
-  static const skeptic = EyeConfig(width: 40, height: 26, borderRadius: 6, topSlope: 0.3, bottomSlope: 0, offsetY: -6, isAsymmetric: true);
-  static const frustrated = EyeConfig(width: 40, height: 12, borderRadius: 5, topSlope: 0, bottomSlope: 0, offsetX: 3, offsetY: -5);
-  static const unimpressed = EyeConfig(width: 40, height: 12, borderRadius: 5, topSlope: 0, bottomSlope: 0, offsetX: 3);
-  static const sleepy = EyeConfig(width: 40, height: 14, borderRadius: 3, topSlope: -0.5, bottomSlope: -0.5, offsetY: -2, isAsymmetric: true);
-  static const suspicious = EyeConfig(width: 40, height: 22, borderRadius: 6, topSlope: 0, bottomSlope: 0, isAsymmetric: true);
-  static const squint = EyeConfig(width: 35, height: 35, borderRadius: 8, topSlope: 0, bottomSlope: 0, offsetX: -10, offsetY: -3, isAsymmetric: true);
-  static const angry = EyeConfig(width: 40, height: 20, borderRadius: 7, topSlope: 0.45, bottomSlope: 0, offsetX: -3);
-  static const furious = EyeConfig(width: 40, height: 30, borderRadius: 5, topSlope: 0.60, bottomSlope: 0, offsetX: -2);
-  static const scared = EyeConfig(width: 40, height: 40, borderRadius: 10, topSlope: -0.1, bottomSlope: 0, offsetX: -3);
-  static const awe = EyeConfig(width: 45, height: 35, borderRadius: 12, topSlope: -0.1, bottomSlope: 0.1, offsetX: 2);
+  static const _blue = Color(0xFF42A5F5);
+  static const _cyan = Color(0xFF26C6DA);
+  static const _pink = Color(0xFFC44582);
+  static const _crimson = Color(0xFFFF2E63);
+  static const _amber = Color(0xFFFFB74D);
+  static const _indigo = Color(0xFF7986CB);
+
+  static const normal = EyeConfig(
+    width: 40,
+    height: 40,
+    borderRadius: 9,
+    topSlope: 0,
+    bottomSlope: 0,
+    color: _blue,
+    mouthWidth: 42,
+    mouthShape: MouthShape.line,
+  );
+
+  static const happy = EyeConfig(
+    width: 40,
+    height: 11,
+    borderRadius: 6,
+    topSlope: 0,
+    bottomSlope: 0,
+    color: _cyan,
+    mouthWidth: 34,
+    mouthShape: MouthShape.uprightTriangle,
+  );
+
+  static const glee = EyeConfig(
+    width: 42,
+    height: 8,
+    borderRadius: 5,
+    topSlope: 0,
+    bottomSlope: 0,
+    color: _cyan,
+    mouthWidth: 38,
+    mouthShape: MouthShape.uprightTriangle,
+  );
+
+  static const sad = EyeConfig(
+    width: 40,
+    height: 18,
+    borderRadius: 6,
+    topSlope: -0.45,
+    bottomSlope: 0,
+    color: _indigo,
+    mouthWidth: 32,
+    mouthShape: MouthShape.invertedTriangle,
+  );
+
+  static const worried = EyeConfig(
+    width: 40,
+    height: 26,
+    borderRadius: 8,
+    topSlope: -0.25,
+    bottomSlope: 0,
+    color: _amber,
+    mouthWidth: 30,
+    mouthShape: MouthShape.invertedTriangle,
+  );
+
+  static const focused = EyeConfig(
+    width: 40,
+    height: 16,
+    borderRadius: 4,
+    topSlope: 0.30,
+    bottomSlope: 0,
+    color: _blue,
+    mouthWidth: 36,
+    mouthShape: MouthShape.line,
+  );
+
+  static const annoyed = EyeConfig(
+    width: 40,
+    height: 13,
+    borderRadius: 5,
+    topSlope: 0.25,
+    bottomSlope: 0,
+    color: _pink,
+    mouthWidth: 34,
+    mouthShape: MouthShape.invertedTriangle,
+  );
+
+  static const surprised = EyeConfig(
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    topSlope: 0,
+    bottomSlope: 0,
+    color: _cyan,
+    mouthWidth: 26,
+    mouthShape: MouthShape.line,
+    offsetY: -2,
+  );
+
+  static const skeptic = EyeConfig(
+    width: 40,
+    height: 28,
+    borderRadius: 6,
+    topSlope: 0.35,
+    bottomSlope: 0,
+    color: _amber,
+    mouthWidth: 38,
+    mouthShape: MouthShape.line,
+    offsetY: -3,
+    isAsymmetric: true,
+  );
+
+  static const frustrated = EyeConfig(
+    width: 40,
+    height: 13,
+    borderRadius: 5,
+    topSlope: 0.20,
+    bottomSlope: 0,
+    color: _pink,
+    mouthWidth: 34,
+    mouthShape: MouthShape.invertedTriangle,
+    offsetY: -3,
+  );
+
+  static const unimpressed = EyeConfig(
+    width: 40,
+    height: 12,
+    borderRadius: 5,
+    topSlope: 0,
+    bottomSlope: 0,
+    color: _blue,
+    mouthWidth: 46,
+    mouthShape: MouthShape.line,
+  );
+
+  static const sleepy = EyeConfig(
+    width: 40,
+    height: 13,
+    borderRadius: 4,
+    topSlope: 0,
+    bottomSlope: 0,
+    color: _indigo,
+    mouthWidth: 30,
+    mouthShape: MouthShape.line,
+    offsetY: 2,
+  );
+
+  static const suspicious = EyeConfig(
+    width: 40,
+    height: 22,
+    borderRadius: 6,
+    topSlope: 0.22,
+    bottomSlope: 0,
+    color: _amber,
+    mouthWidth: 36,
+    mouthShape: MouthShape.line,
+    isAsymmetric: true,
+  );
+
+  static const squint = EyeConfig(
+    width: 38,
+    height: 22,
+    borderRadius: 7,
+    topSlope: 0.15,
+    bottomSlope: 0,
+    color: _blue,
+    mouthWidth: 34,
+    mouthShape: MouthShape.line,
+    isAsymmetric: true,
+  );
+
+  static const angry = EyeConfig(
+    width: 40,
+    height: 22,
+    borderRadius: 6,
+    topSlope: 0.55,
+    bottomSlope: 0,
+    color: _pink,
+    mouthWidth: 36,
+    mouthShape: MouthShape.invertedTriangle,
+  );
+
+  static const furious = EyeConfig(
+    width: 42,
+    height: 28,
+    borderRadius: 5,
+    topSlope: 0.72,
+    bottomSlope: 0,
+    color: _crimson,
+    mouthWidth: 40,
+    mouthShape: MouthShape.invertedTriangle,
+  );
+
+  static const scared = EyeConfig(
+    width: 42,
+    height: 44,
+    borderRadius: 12,
+    topSlope: -0.22,
+    bottomSlope: 0,
+    color: _pink,
+    mouthWidth: 30,
+    mouthShape: MouthShape.invertedTriangle,
+  );
+
+  static const awe = EyeConfig(
+    width: 46,
+    height: 38,
+    borderRadius: 13,
+    topSlope: -0.10,
+    bottomSlope: 0.10,
+    color: _cyan,
+    mouthWidth: 30,
+    mouthShape: MouthShape.uprightTriangle,
+  );
 
   static const values = <FaceEmotion, EyeConfig>{
     FaceEmotion.normal: normal,

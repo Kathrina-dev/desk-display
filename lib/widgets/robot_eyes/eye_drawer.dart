@@ -3,6 +3,13 @@ import 'package:flutter/material.dart';
 import 'eye_presets.dart';
 import 'look_assistant.dart';
 
+enum IdleAction {
+  none,
+  visorScan,
+  coffeeGlance,
+  sparkleBurst,
+}
+
 class EyeDrawer extends CustomPainter {
   EyeDrawer({
     required this.left,
@@ -12,6 +19,8 @@ class EyeDrawer extends CustomPainter {
     required this.blinkFactor,
     this.scanlinePhase = 0,
     this.zProgress = 0,
+    this.idleAction = IdleAction.none,
+    this.idleProgress = 0,
     super.repaint,
   });
 
@@ -22,33 +31,204 @@ class EyeDrawer extends CustomPainter {
   final double blinkFactor;
   final double scanlinePhase;
   final double zProgress;
+  final IdleAction idleAction;
+  final double idleProgress;
 
   static const background = Color(0xFF090909);
-  static const pink = Color(0xFFC44582);
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawColor(background, BlendMode.src);
-    final center = Offset(size.width / 2, size.height * 0.46);
-    _drawEye(canvas, size, center, left, lookLeft, true);
-    _drawEye(canvas, size, center, right, lookRight, false);
-    _drawScanlines(canvas, size);
-    if (zProgress > 0) _drawZzz(canvas, size, zProgress);
+    final center = Offset(size.width / 2, size.height * 0.42);
+    final activeColor = left.color;
+
+    Rect? leftRect;
+    Rect? rightRect;
+    _drawEye(canvas, size, center, left, lookLeft, true, (r) => leftRect = r);
+    _drawEye(canvas, size, center, right, lookRight, false, (r) => rightRect = r);
+
+    _drawMouth(canvas, size, center, left, lookLeft, lookRight);
+    _drawScanlines(canvas, size, activeColor);
+
+    if (idleAction == IdleAction.visorScan && leftRect != null && rightRect != null) {
+      _drawVisorBeam(canvas, leftRect!, rightRect!, activeColor, idleProgress);
+    } else if (idleAction == IdleAction.coffeeGlance) {
+      _drawHologramMug(canvas, size, activeColor, idleProgress);
+    } else if (idleAction == IdleAction.sparkleBurst) {
+      _drawSparkles(canvas, size, center, activeColor, idleProgress);
+    }
+
+    if (zProgress > 0) {
+      final anchor = rightRect?.topRight ?? Offset(size.width * 0.65, size.height * 0.28);
+      _drawZzz(canvas, size, anchor, activeColor, zProgress);
+    }
   }
 
-  void _drawEye(Canvas canvas, Size size, Offset center, EyeConfig config, LookTransform look, bool isLeft) {
+  void _drawEye(
+    Canvas canvas,
+    Size size,
+    Offset center,
+    EyeConfig config,
+    LookTransform look,
+    bool isLeft,
+    void Function(Rect) onRect,
+  ) {
     final scale = size.height / 64.0;
-    final asymmetry = config.isAsymmetric ? (isLeft ? 1.08 : 0.82) : 1.0;
-    final width = (config.width * scale).clamp(0.0, size.width * 0.26) * look.scaleX * (config.isAsymmetric && isLeft ? 1.05 : config.isAsymmetric ? 0.88 : 1.0);
-    final height = config.height * scale * look.scaleY * asymmetry * blinkFactor;
-    if (height <= 1) return;
-    final x = center.dx + config.offsetX * scale + look.moveX * size.width + (isLeft ? -width - 10 * scale : 10 * scale);
+    final asymmetryY = config.isAsymmetric ? (isLeft ? 1.06 : 0.78) : 1.0;
+    final asymmetryX = config.isAsymmetric ? (isLeft ? 1.04 : 0.90) : 1.0;
+
+    final width = (config.width * scale).clamp(0.0, size.width * 0.26) * look.scaleX * asymmetryX;
+    final height = (config.height * scale * look.scaleY * asymmetryY * blinkFactor).clamp(3.0, size.height * 0.65);
+
+    final x = center.dx +
+        config.offsetX * scale +
+        look.moveX * size.width +
+        (isLeft ? -width - 12 * scale : 12 * scale);
     final y = center.dy + config.offsetY * scale + look.moveY * size.height - height / 2;
     final radius = (config.borderRadius * scale).clamp(0.0, height / 2);
-    final effectiveTopSlope = config.isAsymmetric ? config.topSlope * (isLeft ? 1.15 : 0.75) : (isLeft ? config.topSlope : -config.topSlope);
-    final effectiveBottomSlope = config.isAsymmetric ? config.bottomSlope * (isLeft ? 1.15 : 0.75) : (isLeft ? config.bottomSlope : -config.bottomSlope);
-    final path = _eyePath(Rect.fromLTWH(x, y, width, height), radius, effectiveTopSlope, effectiveBottomSlope);
-    canvas.drawPath(path, Paint()..color = pink);
+
+    final effectiveTopSlope = isLeft
+        ? config.topSlope
+        : (config.isAsymmetric ? -config.topSlope * 0.4 : -config.topSlope);
+    final effectiveBottomSlope = isLeft ? config.bottomSlope : -config.bottomSlope;
+
+    final rect = Rect.fromLTWH(x, y, width, height);
+    onRect(rect);
+    final path = _eyePath(rect, radius, effectiveTopSlope, effectiveBottomSlope);
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = config.color.withValues(alpha: 0.25)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+    );
+    canvas.drawPath(path, Paint()..color = config.color);
+  }
+
+  void _drawMouth(
+    Canvas canvas,
+    Size size,
+    Offset center,
+    EyeConfig config,
+    LookTransform leftLook,
+    LookTransform rightLook,
+  ) {
+    final scale = size.height / 64.0;
+    final avgMoveX = (leftLook.moveX + rightLook.moveX) * 0.5 * size.width;
+    final avgMoveY = (leftLook.moveY + rightLook.moveY) * 0.5 * size.height;
+
+    final mouthWidth = config.mouthWidth * scale;
+    final mouthHeight = (4.2 * scale).clamp(12.0, 24.0);
+    final mouthCenter = Offset(
+      center.dx + avgMoveX * 0.75,
+      center.dy + 23 * scale + avgMoveY * 0.65,
+    );
+
+    final strokeWidth = (2.1 * scale).clamp(4.0, 8.0);
+    final glowPaint = Paint()
+      ..color = config.color.withValues(alpha: 0.30)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth * 2.0
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+
+    final corePaint = Paint()
+      ..color = config.color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+
+    final path = Path();
+    switch (config.mouthShape) {
+      case MouthShape.uprightTriangle:
+        // △ Upright triangle for happy/glee/awe
+        path
+          ..moveTo(mouthCenter.dx, mouthCenter.dy - mouthHeight * 0.55)
+          ..lineTo(mouthCenter.dx + mouthWidth * 0.45, mouthCenter.dy + mouthHeight * 0.45)
+          ..lineTo(mouthCenter.dx - mouthWidth * 0.45, mouthCenter.dy + mouthHeight * 0.45)
+          ..close();
+        break;
+      case MouthShape.invertedTriangle:
+        // ▽ Inverted triangle for sad/angry/furious/annoyed
+        path
+          ..moveTo(mouthCenter.dx - mouthWidth * 0.45, mouthCenter.dy - mouthHeight * 0.45)
+          ..lineTo(mouthCenter.dx + mouthWidth * 0.45, mouthCenter.dy - mouthHeight * 0.45)
+          ..lineTo(mouthCenter.dx, mouthCenter.dy + mouthHeight * 0.55)
+          ..close();
+        break;
+      case MouthShape.line:
+        // — Flat horizontal line for neutral/default
+        path
+          ..moveTo(mouthCenter.dx - mouthWidth / 2, mouthCenter.dy)
+          ..lineTo(mouthCenter.dx + mouthWidth / 2, mouthCenter.dy);
+        break;
+    }
+
+    canvas.drawPath(path, glowPaint);
+    canvas.drawPath(path, corePaint);
+  }
+
+  void _drawVisorBeam(Canvas canvas, Rect leftRect, Rect rightRect, Color color, double progress) {
+    final sweep = (progress * 2) <= 1 ? (progress * 2) : (2 - progress * 2);
+    final scanX = leftRect.left + (rightRect.right - leftRect.left) * sweep;
+    final top = (leftRect.top < rightRect.top ? leftRect.top : rightRect.top) - 8;
+    final bottom = (leftRect.bottom > rightRect.bottom ? leftRect.bottom : rightRect.bottom) + 8;
+
+    canvas.drawLine(
+      Offset(scanX, top),
+      Offset(scanX, bottom),
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.85)
+        ..strokeWidth = 3
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+    );
+  }
+
+  void _drawHologramMug(Canvas canvas, Size size, Color color, double progress) {
+    final alpha = progress < 0.15
+        ? progress / 0.15
+        : (progress > 0.85 ? (1.0 - progress) / 0.15 : 1.0);
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.75 * alpha)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+
+    final cx = size.width * 0.76;
+    final cy = size.height * 0.76;
+    // Mug body
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(cx, cy), width: 28, height: 24), const Radius.circular(4)),
+      paint,
+    );
+    // Mug handle
+    canvas.drawArc(Rect.fromCenter(center: Offset(cx + 15, cy), width: 12, height: 14), -1.5, 3.1, false, paint);
+    // Rising steam lines
+    final steamOffset = (progress * 12) % 8;
+    for (final dx in [-6.0, 2.0]) {
+      canvas.drawLine(Offset(cx + dx, cy - 18 - steamOffset), Offset(cx + dx + 3, cy - 26 - steamOffset), paint);
+    }
+  }
+
+  void _drawSparkles(Canvas canvas, Size size, Offset center, Color color, double progress) {
+    final alpha = (1.0 - progress).clamp(0.0, 1.0);
+    final paint = Paint()
+      ..color = color.withValues(alpha: alpha)
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+
+    final offsets = [
+      Offset(-size.width * 0.28, -size.height * 0.22 - progress * 24),
+      Offset(size.width * 0.28, -size.height * 0.20 - progress * 28),
+      Offset(0, -size.height * 0.30 - progress * 20),
+    ];
+    for (final off in offsets) {
+      final p = center + off;
+      canvas.drawLine(Offset(p.dx - 7, p.dy), Offset(p.dx + 7, p.dy), paint);
+      canvas.drawLine(Offset(p.dx, p.dy - 7), Offset(p.dx, p.dy + 7), paint);
+    }
   }
 
   Path _eyePath(Rect rect, double radius, double topSlope, double bottomSlope) {
@@ -56,7 +236,8 @@ class EyeDrawer extends CustomPainter {
     final topRight = rect.top - topSlope * rect.height * 0.5;
     final bottomLeft = rect.bottom + bottomSlope * rect.height * 0.5;
     final bottomRight = rect.bottom - bottomSlope * rect.height * 0.5;
-    final path = Path()
+
+    return Path()
       ..moveTo(rect.left + radius, topLeft)
       ..quadraticBezierTo(rect.left, topLeft, rect.left, topLeft + radius)
       ..lineTo(rect.left, bottomLeft - radius)
@@ -66,28 +247,41 @@ class EyeDrawer extends CustomPainter {
       ..lineTo(rect.right, topRight + radius)
       ..quadraticBezierTo(rect.right, topRight, rect.right - radius, topRight)
       ..close();
-    return path;
   }
 
-  void _drawScanlines(Canvas canvas, Size size) {
-    final paint = Paint()..color = pink.withValues(alpha: 0.08);
+  void _drawScanlines(Canvas canvas, Size size, Color activeColor) {
+    final paint = Paint()..color = activeColor.withValues(alpha: 0.06);
     final offset = (scanlinePhase * 4) % 4;
     for (double y = offset; y < size.height; y += 4) {
       canvas.drawRect(Rect.fromLTWH(0, y, size.width, 1), paint);
     }
   }
 
-  void _drawZzz(Canvas canvas, Size size, double progress) {
-    final paint = Paint()..color = pink.withValues(alpha: 0.7);
-    final style = const TextStyle(color: pink, fontSize: 16, fontWeight: FontWeight.w700);
+  void _drawZzz(Canvas canvas, Size size, Offset eyeTopRight, Color color, double progress) {
+    final baseFontSize = (size.height * 0.075).clamp(22.0, 36.0);
     for (var index = 0; index < 3; index++) {
-      final x = size.width * (0.62 + index * 0.05);
-      final y = size.height * (0.55 - ((progress + index * 0.2) % 1) * 0.2);
-      TextPainter(text: TextSpan(text: 'z', style: style), textDirection: TextDirection.ltr)
+      final cycle = (progress + index * 0.33) % 1.0;
+      final alpha = (1.0 - cycle).clamp(0.15, 0.95);
+      final fontSize = baseFontSize * (0.75 + index * 0.22);
+
+      final x = (eyeTopRight.dx + 12 + index * (baseFontSize * 0.85) + cycle * 14)
+          .clamp(0.0, size.width - fontSize * 1.5);
+      final y = (eyeTopRight.dy - baseFontSize * 0.6 - cycle * (size.height * 0.22))
+          .clamp(12.0, size.height * 0.45);
+
+      final style = TextStyle(
+        color: color.withValues(alpha: alpha),
+        fontSize: fontSize,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.5,
+      );
+      TextPainter(
+        text: TextSpan(text: 'Z', style: style),
+        textDirection: TextDirection.ltr,
+      )
         ..layout()
         ..paint(canvas, Offset(x, y));
     }
-    paint.color = pink;
   }
 
   @override

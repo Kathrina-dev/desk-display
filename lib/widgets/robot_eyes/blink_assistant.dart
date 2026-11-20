@@ -5,7 +5,7 @@ class BlinkAssistant {
 
   final void Function(double factor)? onChanged;
   bool randomBlink = true;
-  Duration interval = const Duration(milliseconds: 4000);
+  Duration interval = const Duration(milliseconds: 4500);
   DateTime _nextBlink = DateTime.now();
   DateTime? _blinkStarted;
   int _blinkCount = 0;

@@ -14,7 +14,7 @@ class FaceBehavior {
   };
   FaceEmotion currentEmotion = FaceEmotion.normal;
   bool randomBehavior = true;
-  Duration interval = const Duration(milliseconds: 500);
+  Duration interval = const Duration(seconds: 10);
   DateTime _nextDecision = DateTime.now();
 
   void setEmotion(FaceEmotion emotion, double weight) => weights[emotion] = weight;
