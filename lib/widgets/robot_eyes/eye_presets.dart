@@ -42,7 +42,7 @@ class EyeConfig {
         bottomSlope: _lerp(bottomSlope, other.bottomSlope, t),
         color: Color.lerp(color, other.color, t) ?? other.color,
         mouthWidth: _lerp(mouthWidth, other.mouthWidth, t),
-        mouthShape: t > 0.35 ? other.mouthShape : mouthShape,
+        mouthShape: t > 0.01 ? other.mouthShape : mouthShape,
         offsetX: _lerp(offsetX, other.offsetX, t),
         offsetY: _lerp(offsetY, other.offsetY, t),
         isAsymmetric: other.isAsymmetric,
@@ -78,7 +78,7 @@ class EyePresets {
     bottomSlope: 0,
     color: _cyan,
     mouthWidth: 34,
-    mouthShape: MouthShape.uprightTriangle,
+    mouthShape: MouthShape.invertedTriangle, // ▽
   );
 
   static const glee = EyeConfig(
@@ -89,7 +89,7 @@ class EyePresets {
     bottomSlope: 0,
     color: _cyan,
     mouthWidth: 38,
-    mouthShape: MouthShape.uprightTriangle,
+    mouthShape: MouthShape.invertedTriangle, // ▽
   );
 
   static const sad = EyeConfig(
@@ -100,7 +100,7 @@ class EyePresets {
     bottomSlope: 0,
     color: _indigo,
     mouthWidth: 32,
-    mouthShape: MouthShape.invertedTriangle,
+    mouthShape: MouthShape.uprightTriangle, // △
   );
 
   static const worried = EyeConfig(
@@ -111,7 +111,7 @@ class EyePresets {
     bottomSlope: 0,
     color: _amber,
     mouthWidth: 30,
-    mouthShape: MouthShape.invertedTriangle,
+    mouthShape: MouthShape.uprightTriangle, // △
   );
 
   static const focused = EyeConfig(
@@ -133,7 +133,7 @@ class EyePresets {
     bottomSlope: 0,
     color: _pink,
     mouthWidth: 34,
-    mouthShape: MouthShape.invertedTriangle,
+    mouthShape: MouthShape.uprightTriangle,
   );
 
   static const surprised = EyeConfig(
@@ -169,7 +169,7 @@ class EyePresets {
     bottomSlope: 0,
     color: _pink,
     mouthWidth: 34,
-    mouthShape: MouthShape.invertedTriangle,
+    mouthShape: MouthShape.uprightTriangle,
     offsetY: -3,
   );
 
@@ -228,7 +228,7 @@ class EyePresets {
     bottomSlope: 0,
     color: _pink,
     mouthWidth: 36,
-    mouthShape: MouthShape.invertedTriangle,
+    mouthShape: MouthShape.uprightTriangle,
   );
 
   static const furious = EyeConfig(
@@ -239,18 +239,7 @@ class EyePresets {
     bottomSlope: 0,
     color: _crimson,
     mouthWidth: 40,
-    mouthShape: MouthShape.invertedTriangle,
-  );
-
-  static const scared = EyeConfig(
-    width: 42,
-    height: 44,
-    borderRadius: 12,
-    topSlope: -0.22,
-    bottomSlope: 0,
-    color: _pink,
-    mouthWidth: 30,
-    mouthShape: MouthShape.invertedTriangle,
+    mouthShape: MouthShape.uprightTriangle,
   );
 
   static const awe = EyeConfig(
@@ -261,7 +250,7 @@ class EyePresets {
     bottomSlope: 0.10,
     color: _cyan,
     mouthWidth: 30,
-    mouthShape: MouthShape.uprightTriangle,
+    mouthShape: MouthShape.invertedTriangle,
   );
 
   static const values = <FaceEmotion, EyeConfig>{
@@ -281,7 +270,6 @@ class EyePresets {
     FaceEmotion.suspicious: suspicious,
     FaceEmotion.squint: squint,
     FaceEmotion.furious: furious,
-    FaceEmotion.scared: scared,
     FaceEmotion.awe: awe,
   };
 

@@ -15,6 +15,5 @@ enum FaceEmotion {
   suspicious,
   squint,
   furious,
-  scared,
   awe,
 }

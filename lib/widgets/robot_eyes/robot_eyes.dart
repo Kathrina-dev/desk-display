@@ -230,9 +230,7 @@ class _RobotEyesState extends State<RobotEyes> with SingleTickerProviderStateMix
     _lastInteraction = DateTime.now();
     _sleepProgress = 0;
 
-    final emotion = wasSleeping
-        ? FaceEmotion.furious
-        : (_random.nextDouble() < 0.75 ? FaceEmotion.angry : FaceEmotion.sad);
+    final emotion = wasSleeping ? FaceEmotion.furious : FaceEmotion.angry;
     _temporaryEmotion(emotion, const Duration(seconds: 3));
   }
 

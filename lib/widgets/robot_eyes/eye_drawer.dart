@@ -88,9 +88,9 @@ class EyeDrawer extends CustomPainter {
     final radius = (config.borderRadius * scale).clamp(0.0, height / 2);
 
     final effectiveTopSlope = isLeft
-        ? config.topSlope
-        : (config.isAsymmetric ? -config.topSlope * 0.4 : -config.topSlope);
-    final effectiveBottomSlope = isLeft ? config.bottomSlope : -config.bottomSlope;
+        ? -config.topSlope
+        : (config.isAsymmetric ? config.topSlope * 0.4 : config.topSlope);
+    final effectiveBottomSlope = isLeft ? -config.bottomSlope : config.bottomSlope;
 
     final rect = Rect.fromLTWH(x, y, width, height);
     onRect(rect);
@@ -117,57 +117,55 @@ class EyeDrawer extends CustomPainter {
     final avgMoveX = (leftLook.moveX + rightLook.moveX) * 0.5 * size.width;
     final avgMoveY = (leftLook.moveY + rightLook.moveY) * 0.5 * size.height;
 
-    final mouthWidth = config.mouthWidth * scale;
-    final mouthHeight = (4.2 * scale).clamp(12.0, 24.0);
+    final mouthWidth = (config.mouthWidth * scale * 0.72).clamp(36.0, 110.0);
+    final mouthHeight = (6.2 * scale).clamp(24.0, 48.0);
     final mouthCenter = Offset(
       center.dx + avgMoveX * 0.75,
-      center.dy + 23 * scale + avgMoveY * 0.65,
+      center.dy + 22 * scale + avgMoveY * 0.65,
     );
 
-    final strokeWidth = (2.1 * scale).clamp(4.0, 8.0);
     final glowPaint = Paint()
-      ..color = config.color.withValues(alpha: 0.30)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth * 2.0
-      ..strokeJoin = StrokeJoin.round
-      ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+      ..color = config.color.withValues(alpha: 0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
 
-    final corePaint = Paint()
+    final fillPaint = Paint()
       ..color = config.color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeJoin = StrokeJoin.round
-      ..strokeCap = StrokeCap.round;
+      ..style = PaintingStyle.fill;
+
+    if (config.mouthShape == MouthShape.line) {
+      final barHeight = (2.2 * scale).clamp(6.0, 11.0);
+      final barRect = RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: mouthCenter,
+          width: config.mouthWidth * scale,
+          height: barHeight,
+        ),
+        Radius.circular(barHeight / 2),
+      );
+      canvas.drawRRect(barRect, glowPaint);
+      canvas.drawRRect(barRect, fillPaint);
+      return;
+    }
 
     final path = Path();
-    switch (config.mouthShape) {
-      case MouthShape.uprightTriangle:
-        // △ Upright triangle for happy/glee/awe
-        path
-          ..moveTo(mouthCenter.dx, mouthCenter.dy - mouthHeight * 0.55)
-          ..lineTo(mouthCenter.dx + mouthWidth * 0.45, mouthCenter.dy + mouthHeight * 0.45)
-          ..lineTo(mouthCenter.dx - mouthWidth * 0.45, mouthCenter.dy + mouthHeight * 0.45)
-          ..close();
-        break;
-      case MouthShape.invertedTriangle:
-        // ▽ Inverted triangle for sad/angry/furious/annoyed
-        path
-          ..moveTo(mouthCenter.dx - mouthWidth * 0.45, mouthCenter.dy - mouthHeight * 0.45)
-          ..lineTo(mouthCenter.dx + mouthWidth * 0.45, mouthCenter.dy - mouthHeight * 0.45)
-          ..lineTo(mouthCenter.dx, mouthCenter.dy + mouthHeight * 0.55)
-          ..close();
-        break;
-      case MouthShape.line:
-        // — Flat horizontal line for neutral/default
-        path
-          ..moveTo(mouthCenter.dx - mouthWidth / 2, mouthCenter.dy)
-          ..lineTo(mouthCenter.dx + mouthWidth / 2, mouthCenter.dy);
-        break;
+    if (config.mouthShape == MouthShape.uprightTriangle) {
+      // △ Upright solid triangle (happy / glee / awe)
+      path
+        ..moveTo(mouthCenter.dx, mouthCenter.dy - mouthHeight * 0.55)
+        ..lineTo(mouthCenter.dx + mouthWidth * 0.5, mouthCenter.dy + mouthHeight * 0.45)
+        ..lineTo(mouthCenter.dx - mouthWidth * 0.5, mouthCenter.dy + mouthHeight * 0.45)
+        ..close();
+    } else {
+      // ▽ Inverted solid triangle (angry / furious / annoyed / frustrated)
+      path
+        ..moveTo(mouthCenter.dx - mouthWidth * 0.5, mouthCenter.dy - mouthHeight * 0.45)
+        ..lineTo(mouthCenter.dx + mouthWidth * 0.5, mouthCenter.dy - mouthHeight * 0.45)
+        ..lineTo(mouthCenter.dx, mouthCenter.dy + mouthHeight * 0.55)
+        ..close();
     }
 
     canvas.drawPath(path, glowPaint);
-    canvas.drawPath(path, corePaint);
+    canvas.drawPath(path, fillPaint);
   }
 
   void _drawVisorBeam(Canvas canvas, Rect leftRect, Rect rightRect, Color color, double progress) {

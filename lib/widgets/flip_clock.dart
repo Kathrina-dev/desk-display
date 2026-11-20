@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -14,7 +13,8 @@ class _FlipClockState extends State<FlipClock> {
   late DateTime _now;
   Timer? _ticker;
 
-  static const _accentBlue = Color(0xFF42A5F5);
+  static const _litWhite = Color(0xFFF8FAFC);
+  static const _unlitGhost = Color(0xFF141518);
 
   @override
   void initState() {
@@ -35,12 +35,12 @@ class _FlipClockState extends State<FlipClock> {
   Widget build(BuildContext context) {
     final hour = _now.hour.toString().padLeft(2, '0');
     final minute = _now.minute.toString().padLeft(2, '0');
-    final colonVisible = _now.second.isEven;
+    final colonLit = _now.second.isEven;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final digitWidth = ((constraints.maxWidth - 96) / 4).clamp(56.0, 210.0);
-        final digitHeight = (constraints.maxHeight * 0.78).clamp(96.0, digitWidth * 1.38);
+        final digitWidth = ((constraints.maxWidth - 110) / 4).clamp(48.0, 190.0);
+        final digitHeight = (constraints.maxHeight * 0.72).clamp(88.0, digitWidth * 1.72);
 
         return Center(
           child: FittedBox(
@@ -48,16 +48,45 @@ class _FlipClockState extends State<FlipClock> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _FlipPair(value: hour, width: digitWidth, height: digitHeight),
+                _SevenSegmentDigit(
+                  digit: int.parse(hour[0]),
+                  width: digitWidth,
+                  height: digitHeight,
+                  litColor: _litWhite,
+                  unlitColor: _unlitGhost,
+                ),
+                SizedBox(width: digitWidth * 0.22),
+                _SevenSegmentDigit(
+                  digit: int.parse(hour[1]),
+                  width: digitWidth,
+                  height: digitHeight,
+                  litColor: _litWhite,
+                  unlitColor: _unlitGhost,
+                ),
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: digitWidth * 0.14),
-                  child: _ColonDots(
+                  padding: EdgeInsets.symmetric(horizontal: digitWidth * 0.24),
+                  child: _SegmentColon(
                     height: digitHeight,
-                    color: _accentBlue,
-                    active: colonVisible,
+                    litColor: _litWhite,
+                    unlitColor: _unlitGhost,
+                    lit: colonLit,
                   ),
                 ),
-                _FlipPair(value: minute, width: digitWidth, height: digitHeight),
+                _SevenSegmentDigit(
+                  digit: int.parse(minute[0]),
+                  width: digitWidth,
+                  height: digitHeight,
+                  litColor: _litWhite,
+                  unlitColor: _unlitGhost,
+                ),
+                SizedBox(width: digitWidth * 0.22),
+                _SevenSegmentDigit(
+                  digit: int.parse(minute[1]),
+                  width: digitWidth,
+                  height: digitHeight,
+                  litColor: _litWhite,
+                  unlitColor: _unlitGhost,
+                ),
               ],
             ),
           ),
@@ -67,290 +96,241 @@ class _FlipClockState extends State<FlipClock> {
   }
 }
 
-class _ColonDots extends StatelessWidget {
-  const _ColonDots({
+class _SegmentColon extends StatelessWidget {
+  const _SegmentColon({
     required this.height,
-    required this.color,
-    required this.active,
+    required this.litColor,
+    required this.unlitColor,
+    required this.lit,
   });
 
   final double height;
-  final Color color;
-  final bool active;
+  final Color litColor;
+  final Color unlitColor;
+  final bool lit;
 
   @override
   Widget build(BuildContext context) {
-    final dotSize = (height * 0.085).clamp(8.0, 18.0);
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeInOut,
-      opacity: active ? 1.0 : 0.28,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _dot(dotSize),
-          SizedBox(height: height * 0.22),
-          _dot(dotSize),
-        ],
-      ),
+    final size = (height * 0.08).clamp(7.0, 16.0);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _dot(size),
+        SizedBox(height: height * 0.24),
+        _dot(size),
+      ],
     );
   }
 
   Widget _dot(double size) {
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.55),
-            blurRadius: size * 1.1,
-            spreadRadius: 1,
-          ),
-        ],
+        color: lit ? litColor : unlitColor,
+        borderRadius: BorderRadius.circular(size * 0.28),
+        boxShadow: lit
+            ? [
+                BoxShadow(
+                  color: litColor.withValues(alpha: 0.45),
+                  blurRadius: size * 1.2,
+                  spreadRadius: 0.5,
+                ),
+              ]
+            : const [],
       ),
     );
   }
 }
 
-class _FlipPair extends StatelessWidget {
-  const _FlipPair({
-    required this.value,
+class _SevenSegmentDigit extends StatelessWidget {
+  const _SevenSegmentDigit({
+    required this.digit,
     required this.width,
     required this.height,
+    required this.litColor,
+    required this.unlitColor,
   });
 
-  final String value;
+  final int digit;
   final double width;
   final double height;
+  final Color litColor;
+  final Color unlitColor;
+
+  // Bitmask for segments [a, b, c, d, e, f, g]
+  //   a
+  // f   b
+  //   g
+  // e   c
+  //   d
+  static const _digitMasks = <int, List<bool>>{
+    0: [true, true, true, true, true, true, false],
+    1: [false, true, true, false, false, false, false],
+    2: [true, true, false, true, true, false, true],
+    3: [true, true, true, true, false, false, true],
+    4: [false, true, true, false, false, true, true],
+    5: [true, false, true, true, false, true, true],
+    6: [true, false, true, true, true, true, true],
+    7: [true, true, true, false, false, false, false],
+    8: [true, true, true, true, true, true, true],
+    9: [true, true, true, true, false, true, true],
+  };
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _AppleFlipDigit(value: value[0], width: width, height: height),
-        SizedBox(width: width * 0.08),
-        _AppleFlipDigit(value: value[1], width: width, height: height),
-      ],
+    return SizedBox(
+      width: width,
+      height: height,
+      child: CustomPaint(
+        painter: _SevenSegmentPainter(
+          activeSegments: _digitMasks[digit] ?? _digitMasks[8]!,
+          litColor: litColor,
+          unlitColor: unlitColor,
+        ),
+      ),
     );
   }
 }
 
-class _AppleFlipDigit extends StatefulWidget {
-  const _AppleFlipDigit({
-    required this.value,
-    required this.width,
-    required this.height,
+class _SevenSegmentPainter extends CustomPainter {
+  const _SevenSegmentPainter({
+    required this.activeSegments,
+    required this.litColor,
+    required this.unlitColor,
   });
 
-  final String value;
-  final double width;
-  final double height;
+  final List<bool> activeSegments;
+  final Color litColor;
+  final Color unlitColor;
 
   @override
-  State<_AppleFlipDigit> createState() => _AppleFlipDigitState();
-}
+  void paint(Canvas canvas, Size size) {
+    final t = (size.width * 0.145).clamp(6.0, 22.0); // Segment thickness
+    final halfT = t / 2;
+    final gap = (t * 0.24).clamp(1.8, 5.0); // Clean miter spacing between segments
+    final midY = size.height / 2;
 
-class _AppleFlipDigitState extends State<_AppleFlipDigit>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late String _currentValue;
-  late String _previousValue;
+    final segments = <Path>[
+      // a: top horizontal
+      _horizontalSegment(
+        left: halfT + gap,
+        right: size.width - halfT - gap,
+        centerY: halfT,
+        thickness: t,
+      ),
+      // b: top-right vertical
+      _verticalSegment(
+        top: halfT + gap,
+        bottom: midY - gap,
+        centerX: size.width - halfT,
+        thickness: t,
+      ),
+      // c: bottom-right vertical
+      _verticalSegment(
+        top: midY + gap,
+        bottom: size.height - halfT - gap,
+        centerX: size.width - halfT,
+        thickness: t,
+      ),
+      // d: bottom horizontal
+      _horizontalSegment(
+        left: halfT + gap,
+        right: size.width - halfT - gap,
+        centerY: size.height - halfT,
+        thickness: t,
+      ),
+      // e: bottom-left vertical
+      _verticalSegment(
+        top: midY + gap,
+        bottom: size.height - halfT - gap,
+        centerX: halfT,
+        thickness: t,
+      ),
+      // f: top-left vertical
+      _verticalSegment(
+        top: halfT + gap,
+        bottom: midY - gap,
+        centerX: halfT,
+        thickness: t,
+      ),
+      // g: middle horizontal
+      _horizontalSegment(
+        left: halfT + gap,
+        right: size.width - halfT - gap,
+        centerY: midY,
+        thickness: t,
+      ),
+    ];
 
-  static const _digitBlue = Color(0xFF64B5F6);
-  static const _digitTint = Color(0xFFE3F2FD);
+    final unlitPaint = Paint()
+      ..color = unlitColor
+      ..style = PaintingStyle.fill;
 
-  @override
-  void initState() {
-    super.initState();
-    _currentValue = widget.value;
-    _previousValue = widget.value;
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 480),
-    )..value = 1.0;
-  }
+    final glowPaint = Paint()
+      ..color = litColor.withValues(alpha: 0.24)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, t * 0.85);
 
-  @override
-  void didUpdateWidget(covariant _AppleFlipDigit oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.value != _currentValue) {
-      _previousValue = _currentValue;
-      _currentValue = widget.value;
-      _controller.forward(from: 0.0);
+    final litPaint = Paint()
+      ..color = litColor
+      ..style = PaintingStyle.fill;
+
+    // Pass 1: Draw subtle unlit ghost segments
+    for (var i = 0; i < 7; i++) {
+      if (!activeSegments[i]) {
+        canvas.drawPath(segments[i], unlitPaint);
+      }
+    }
+
+    // Pass 2: Draw active white segments with soft OLED bloom
+    for (var i = 0; i < 7; i++) {
+      if (activeSegments[i]) {
+        canvas.drawPath(segments[i], glowPaint);
+        canvas.drawPath(segments[i], litPaint);
+      }
     }
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  /// Beveled hexagonal horizontal bar
+  Path _horizontalSegment({
+    required double left,
+    required double right,
+    required double centerY,
+    required double thickness,
+  }) {
+    final h = thickness / 2;
+    return Path()
+      ..moveTo(left, centerY)
+      ..lineTo(left + h, centerY - h)
+      ..lineTo(right - h, centerY - h)
+      ..lineTo(right, centerY)
+      ..lineTo(right - h, centerY + h)
+      ..lineTo(left + h, centerY + h)
+      ..close();
   }
 
-  Widget _buildHalfCard(String digit, {required bool isTop, double shade = 0.0}) {
-    final radius = Radius.circular(widget.width * 0.14);
-    final borderRadius = isTop
-        ? BorderRadius.vertical(top: radius)
-        : BorderRadius.vertical(bottom: radius);
-
-    return Container(
-      width: widget.width,
-      height: widget.height / 2,
-      decoration: BoxDecoration(
-        borderRadius: borderRadius,
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: isTop
-              ? const [Color(0xFF191C22), Color(0xFF121419)]
-              : const [Color(0xFF101217), Color(0xFF0C0D11)],
-        ),
-        border: Border.all(
-          color: const Color(0xFF42A5F5).withValues(alpha: 0.14),
-          width: 0.8,
-        ),
-      ),
-      child: ClipRRect(
-        borderRadius: borderRadius,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            OverflowBox(
-              maxHeight: widget.height,
-              minHeight: widget.height,
-              alignment: isTop ? Alignment.topCenter : Alignment.bottomCenter,
-              child: Center(
-                child: ShaderMask(
-                  shaderCallback: (bounds) => const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [_digitTint, _digitBlue],
-                    stops: [0.15, 0.92],
-                  ).createShader(bounds),
-                  child: Text(
-                    digit,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: widget.height * 0.72,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -2,
-                      height: 1.0,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            if (shade > 0)
-              Container(color: Colors.black.withValues(alpha: shade.clamp(0.0, 0.55))),
-          ],
-        ),
-      ),
-    );
+  /// Beveled hexagonal vertical bar
+  Path _verticalSegment({
+    required double top,
+    required double bottom,
+    required double centerX,
+    required double thickness,
+  }) {
+    final h = thickness / 2;
+    return Path()
+      ..moveTo(centerX, top)
+      ..lineTo(centerX + h, top + h)
+      ..lineTo(centerX + h, bottom - h)
+      ..lineTo(centerX, bottom)
+      ..lineTo(centerX - h, bottom - h)
+      ..lineTo(centerX - h, top + h)
+      ..close();
   }
 
   @override
-  Widget build(BuildContext context) {
-    final radius = widget.width * 0.14;
-    final notchWidth = (widget.width * 0.025).clamp(2.5, 5.0);
-    final notchHeight = (widget.height * 0.07).clamp(8.0, 16.0);
-
-    return Container(
-      width: widget.width,
-      height: widget.height,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.75),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-          BoxShadow(
-            color: const Color(0xFF42A5F5).withValues(alpha: 0.06),
-            blurRadius: 28,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) {
-          final t = Curves.easeInOutCubic.transform(_controller.value);
-          final isFirstHalf = t < 0.5;
-          final angle = isFirstHalf
-              ? (t * math.pi) // 0 -> pi/2 (top flap folds down)
-              : ((1.0 - t) * math.pi); // pi/2 -> 0 (bottom flap unfolds)
-
-          return Stack(
-            children: [
-              // Static background halves
-              Column(
-                children: [
-                  _buildHalfCard(_currentValue, isTop: true),
-                  _buildHalfCard(
-                    isFirstHalf ? _previousValue : _currentValue,
-                    isTop: false,
-                    shade: isFirstHalf ? t * 0.45 : (1.0 - t) * 0.35,
-                  ),
-                ],
-              ),
-
-              // Active folding flap
-              if (t < 1.0)
-                Align(
-                  alignment: isFirstHalf ? Alignment.topCenter : Alignment.bottomCenter,
-                  child: Transform(
-                    alignment: isFirstHalf ? Alignment.bottomCenter : Alignment.topCenter,
-                    transform: Matrix4.identity()
-                      ..setEntry(3, 2, 0.0018)
-                      ..rotateX(isFirstHalf ? angle : -angle),
-                    child: _buildHalfCard(
-                      isFirstHalf ? _previousValue : _currentValue,
-                      isTop: isFirstHalf,
-                      shade: isFirstHalf ? t * 0.6 : (1.0 - t) * 0.5,
-                    ),
-                  ),
-                ),
-
-              // Hairline split seam
-              Align(
-                alignment: Alignment.center,
-                child: Container(
-                  height: 1.5,
-                  color: const Color(0xFF060709),
-                ),
-              ),
-
-              // Subtle Apple-style side hinge notches
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  width: notchWidth,
-                  height: notchHeight,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF060709),
-                    borderRadius: BorderRadius.horizontal(right: Radius.circular(notchWidth)),
-                  ),
-                ),
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Container(
-                  width: notchWidth,
-                  height: notchHeight,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF060709),
-                    borderRadius: BorderRadius.horizontal(left: Radius.circular(notchWidth)),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
+  bool shouldRepaint(covariant _SevenSegmentPainter oldDelegate) =>
+      oldDelegate.activeSegments != activeSegments ||
+      oldDelegate.litColor != litColor ||
+      oldDelegate.unlitColor != unlitColor;
 }

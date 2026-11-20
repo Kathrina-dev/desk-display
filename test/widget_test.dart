@@ -12,12 +12,12 @@ import 'package:desk_display/main.dart';
 import 'package:desk_display/widgets/robot_eyes.dart';
 
 void main() {
-  testWidgets('desk display shows the clock and v2 placeholder page', (WidgetTester tester) async {
+  testWidgets('desk display shows the clock and robot eyes page', (WidgetTester tester) async {
     await tester.pumpWidget(const MyApp());
 
     expect(find.byType(PageView), findsOneWidget);
     expect(find.textContaining('DESK '), findsOneWidget);
-    await tester.drag(find.byType(PageView), const Offset(-400, 0));
+    await tester.drag(find.byType(PageView), const Offset(0, -400));
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(RobotEyes), findsOneWidget);
   });
