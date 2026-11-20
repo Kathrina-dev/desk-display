@@ -7,7 +7,7 @@ import '../services/desk_timer_service.dart';
 import '../services/lift_detector.dart';
 import '../services/lock_service.dart';
 import '../widgets/flip_clock.dart';
-import '../widgets/robot_eyes.dart';
+import '../widgets/robot_eyes/robot_eyes.dart';
 
 class StandScreen extends StatefulWidget {
   const StandScreen({super.key});
@@ -63,7 +63,7 @@ class _StandScreenState extends State<StandScreen> {
       onPopInvokedWithResult: (didPop, result) {},
       child: Scaffold(
         body: PageView(
-          scrollDirection: Axis.vertical,
+          scrollDirection: Axis.horizontal,
           children: [
             _ClockPage(seconds: _timer.elapsedSeconds, onEmergencyExit: _exitStand),
             const RobotEyes(),
