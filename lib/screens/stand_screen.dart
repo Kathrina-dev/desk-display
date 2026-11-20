@@ -7,6 +7,7 @@ import '../services/desk_timer_service.dart';
 import '../services/lift_detector.dart';
 import '../services/lock_service.dart';
 import '../widgets/flip_clock.dart';
+import '../widgets/robot_eyes.dart';
 
 class StandScreen extends StatefulWidget {
   const StandScreen({super.key});
@@ -64,9 +65,7 @@ class _StandScreenState extends State<StandScreen> {
         body: PageView(
           children: [
             _ClockPage(seconds: _timer.elapsedSeconds, onEmergencyExit: _exitStand),
-            const Center(child: Text('AMBIENT VISUALIZER — V2', style: TextStyle(
-              color: Color(0x66F2F2F2), letterSpacing: 3, fontSize: 14,
-            ))),
+            const RobotEyes(),
           ],
         ),
       ),
