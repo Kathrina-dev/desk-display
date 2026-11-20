@@ -4,10 +4,18 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
-import '../services/ambient_audio_service.dart';
-
-enum RobotMood { alert, sleepy }
-enum RobotExpression { baseline, happy, startled, scan, sneeze, hologram }
+enum RoboEyeState {
+  defaultState,
+  happy,
+  curiosity,
+  sleepy,
+  asleep,
+  angry,
+  scare,
+  scared,
+  tiltedLeft,
+  tiltedRight,
+}
 
 class RobotEyes extends StatefulWidget {
   const RobotEyes({super.key});
@@ -18,19 +26,16 @@ class RobotEyes extends StatefulWidget {
 
 class _RobotEyesState extends State<RobotEyes> with SingleTickerProviderStateMixin {
   late final AnimationController _animation;
-  final _audio = AmbientAudioService();
   StreamSubscription<AccelerometerEvent>? _tiltSubscription;
-  StreamSubscription<double>? _audioSubscription;
   Timer? _blinkTimer;
   Timer? _idleTimer;
-  Timer? _expressionTimer;
-  final _particles = <_Particle>[];
-  RobotExpression _expression = RobotExpression.baseline;
+  Timer? _stateTimer;
+  RoboEyeState _state = RoboEyeState.defaultState;
   double _gazeX = 0;
   double _gazeY = 0;
-  double _audioLevel = 0;
   DateTime _lastInteraction = DateTime.now();
   bool _blinking = false;
+  final _roboEyesModel = _RoboEyesModel();
 
   @override
   void initState() {
@@ -41,15 +46,13 @@ class _RobotEyesState extends State<RobotEyes> with SingleTickerProviderStateMix
     _scheduleBlink();
     _scheduleIdle();
     _tiltSubscription = accelerometerEventStream().listen(_onTilt);
-    _audioSubscription = _audio.levels.listen((level) {
-      if (mounted) setState(() => _audioLevel = (_audioLevel * 0.7) + (level * 0.3));
-    });
-    unawaited(_audio.start());
   }
 
   void _scheduleBlink() {
     _blinkTimer?.cancel();
-    final seconds = _currentMood == RobotMood.sleepy ? 8 : 3 + math.Random().nextInt(4);
+    final seconds = _state == RoboEyeState.sleepy || _state == RoboEyeState.asleep
+      ? 8
+      : 3 + math.Random().nextInt(4);
     _blinkTimer = Timer(Duration(seconds: seconds), () {
       if (!mounted) return;
       setState(() => _blinking = true);
@@ -62,11 +65,11 @@ class _RobotEyesState extends State<RobotEyes> with SingleTickerProviderStateMix
 
   void _scheduleIdle() {
     _idleTimer?.cancel();
-    _idleTimer = Timer(const Duration(seconds: 25), () {
+    _idleTimer = Timer(const Duration(seconds: 5), () {
       if (!mounted) return;
       if (DateTime.now().difference(_lastInteraction).inSeconds >= 20) {
-        final idle = RobotExpression.values[2 + math.Random().nextInt(4)];
-        _setExpression(idle, const Duration(seconds: 4));
+        _setState(math.Random().nextBool() ? RoboEyeState.sleepy : RoboEyeState.curiosity,
+            const Duration(seconds: 10));
       }
       _scheduleIdle();
     });
@@ -80,40 +83,44 @@ class _RobotEyesState extends State<RobotEyes> with SingleTickerProviderStateMix
     setState(() {
       _gazeX = (event.x / 1.8).clamp(-1.0, 1.0);
       _gazeY = (event.y / 1.8).clamp(-0.5, 0.5);
+      _state = event.x < 0 ? RoboEyeState.tiltedLeft : RoboEyeState.tiltedRight;
+    });
+    _stateTimer?.cancel();
+    _stateTimer = Timer(const Duration(seconds: 1), () {
+      if (mounted) _setState(RoboEyeState.defaultState, Duration.zero);
     });
   }
 
-  void _setExpression(RobotExpression expression, Duration duration) {
-    _expressionTimer?.cancel();
+  void _setState(RoboEyeState state, Duration duration) {
+    _stateTimer?.cancel();
     _lastInteraction = DateTime.now();
-    setState(() => _expression = expression);
-    _expressionTimer = Timer(duration, () {
-      if (mounted) setState(() => _expression = RobotExpression.baseline);
-    });
+    if (mounted) setState(() => _state = state);
+    if (duration > Duration.zero) {
+      _stateTimer = Timer(duration, () {
+        if (!mounted) return;
+        _setState(
+          state == RoboEyeState.sleepy ? RoboEyeState.asleep : RoboEyeState.defaultState,
+          Duration.zero,
+        );
+      });
+    }
   }
 
   void _pet() {
-    _setExpression(RobotExpression.happy, const Duration(seconds: 2));
-    setState(() {
-      _particles.addAll(List.generate(5, (index) => _Particle(
-        x: 0.2 + math.Random().nextDouble() * 0.6,
-        y: 0.55 + math.Random().nextDouble() * 0.2,
-        symbol: index.isEven ? '*' : '+',
-      )));
-    });
+    if (_state == RoboEyeState.sleepy || _state == RoboEyeState.asleep) {
+      _setState(RoboEyeState.angry, const Duration(seconds: 5));
+    } else {
+      _setState(math.Random().nextInt(4) == 0 ? RoboEyeState.angry : RoboEyeState.happy,
+          const Duration(milliseconds: 500));
+    }
   }
 
-  void _poke() => _setExpression(RobotExpression.startled, const Duration(seconds: 2));
+  void _poke() => _setState(RoboEyeState.scared, const Duration(seconds: 2));
 
   void _onPointerMove(PointerMoveEvent event, BoxConstraints size) {
     if (event.position.dy > size.maxHeight * 0.52) return;
     _lastInteraction = DateTime.now();
     if (event.delta.distance > 3) _pet();
-  }
-
-  RobotMood get _currentMood {
-    final hour = DateTime.now().hour;
-    return hour >= 23 || hour < 6 ? RobotMood.sleepy : RobotMood.alert;
   }
 
   @override
@@ -129,14 +136,11 @@ class _RobotEyesState extends State<RobotEyes> with SingleTickerProviderStateMix
             color: const Color(0xFF090909),
             child: CustomPaint(
               painter: _RobotEyesPainter(
-                mood: _currentMood,
-                expression: _expression,
+                state: _state,
                 blink: _blinking,
                 gazeX: _gazeX,
                 gazeY: _gazeY,
-                audioLevel: _audioLevel,
-                animation: _animation.value,
-                particles: _particles,
+                model: _roboEyesModel,
               ),
               size: Size.infinite,
             ),
@@ -151,71 +155,154 @@ class _RobotEyesState extends State<RobotEyes> with SingleTickerProviderStateMix
     _animation.dispose();
     _blinkTimer?.cancel();
     _idleTimer?.cancel();
-    _expressionTimer?.cancel();
+    _stateTimer?.cancel();
     _tiltSubscription?.cancel();
-    _audioSubscription?.cancel();
-    unawaited(_audio.dispose());
     super.dispose();
   }
 }
 
-class _Particle {
-  const _Particle({required this.x, required this.y, required this.symbol});
-  final double x;
-  final double y;
-  final String symbol;
+/// Parametric eye geometry adapted from the RoboEyes display model.
+/// Current values ease toward next values every paint frame.
+class _RoboEyesModel {
+  double screenWidth = 0;
+  double screenHeight = 0;
+
+  double eyeLwidthDefault = 0;
+  double eyeLheightDefault = 0;
+  double eyeLwidthCurrent = 0;
+  double eyeLheightCurrent = 0;
+  double eyeLwidthNext = 0;
+  double eyeLheightNext = 0;
+  double eyeLborderRadiusDefault = 0;
+  double eyeLborderRadiusCurrent = 0;
+  double eyeLborderRadiusNext = 0;
+
+  double eyeRwidthDefault = 0;
+  double eyeRheightDefault = 0;
+  double eyeRwidthCurrent = 0;
+  double eyeRheightCurrent = 0;
+  double eyeRwidthNext = 0;
+  double eyeRheightNext = 0;
+  double eyeRborderRadiusDefault = 0;
+  double eyeRborderRadiusCurrent = 0;
+  double eyeRborderRadiusNext = 0;
+
+  double eyeLx = 0;
+  double eyeLy = 0;
+  double eyeLxNext = 0;
+  double eyeLyNext = 0;
+  double eyeRx = 0;
+  double eyeRy = 0;
+  double eyeRxNext = 0;
+  double eyeRyNext = 0;
+  double spaceBetweenDefault = 0;
+  double spaceBetweenCurrent = 0;
+  double spaceBetweenNext = 0;
+  double eyelidsTiredHeight = 0;
+  double eyelidsTiredHeightNext = 0;
+  double eyelidsHappyBottomOffset = 0;
+  double eyelidsHappyBottomOffsetNext = 0;
+  bool _configured = false;
+
+  void update(Size size, RoboEyeState state, bool blink, double gazeX, double gazeY) {
+    final width = math.min(size.width * 0.27, (size.width * 0.86 - size.width * 0.06) / 2);
+    final height = size.height * 0.34;
+    final gap = size.width * 0.06;
+    if (!_configured) {
+      screenWidth = size.width;
+      screenHeight = size.height;
+      eyeLwidthDefault = width;
+      eyeLheightDefault = height;
+      eyeRwidthDefault = width;
+      eyeRheightDefault = height;
+      eyeLwidthCurrent = width;
+      eyeRwidthCurrent = width;
+      eyeLheightCurrent = height;
+      eyeRheightCurrent = height;
+      eyeLwidthNext = width;
+      eyeRwidthNext = width;
+      eyeLheightNext = height;
+      eyeRheightNext = height;
+      eyeLborderRadiusDefault = width * 0.12;
+      eyeRborderRadiusDefault = width * 0.12;
+      eyeLborderRadiusCurrent = eyeLborderRadiusDefault;
+      eyeRborderRadiusCurrent = eyeRborderRadiusDefault;
+      eyeLborderRadiusNext = eyeLborderRadiusDefault;
+      eyeRborderRadiusNext = eyeRborderRadiusDefault;
+      spaceBetweenDefault = gap;
+      spaceBetweenCurrent = gap;
+      spaceBetweenNext = gap;
+      _configured = true;
+    }
+
+    final sleepy = state == RoboEyeState.sleepy;
+    final asleep = state == RoboEyeState.asleep;
+    final closed = blink;
+    final targetHeight = closed ? 1.0 : (asleep ? 3.0 : (sleepy ? height * 0.52 : height));
+    eyeLheightNext = targetHeight;
+    eyeRheightNext = targetHeight;
+    eyelidsTiredHeightNext = sleepy ? targetHeight * 0.12 : 0;
+    eyelidsHappyBottomOffsetNext = state == RoboEyeState.happy ? targetHeight * 0.42 : 0;
+    final center = size.width / 2;
+    final y = size.height * 0.45 + gazeY * size.height * 0.04;
+    eyeLxNext = center - gap / 2 - width + gazeX * size.width * 0.025;
+    eyeLyNext = y - targetHeight / 2;
+    eyeRxNext = eyeLxNext + width + gap;
+    eyeRyNext = eyeLyNext;
+
+    eyeLwidthCurrent = _ease(eyeLwidthCurrent, eyeLwidthNext);
+    eyeRwidthCurrent = _ease(eyeRwidthCurrent, eyeRwidthNext);
+    eyeLheightCurrent = _ease(eyeLheightCurrent, eyeLheightNext);
+    eyeRheightCurrent = _ease(eyeRheightCurrent, eyeRheightNext);
+    eyeLx = _ease(eyeLx, eyeLxNext);
+    eyeLy = _ease(eyeLy, eyeLyNext);
+    eyeRx = _ease(eyeRx, eyeRxNext);
+    eyeRy = _ease(eyeRy, eyeRyNext);
+    eyeLborderRadiusCurrent = _ease(eyeLborderRadiusCurrent, eyeLborderRadiusNext);
+    eyeRborderRadiusCurrent = _ease(eyeRborderRadiusCurrent, eyeRborderRadiusNext);
+    spaceBetweenCurrent = _ease(spaceBetweenCurrent, spaceBetweenNext);
+    eyelidsTiredHeight = _ease(eyelidsTiredHeight, eyelidsTiredHeightNext);
+    eyelidsHappyBottomOffset = _ease(eyelidsHappyBottomOffset, eyelidsHappyBottomOffsetNext);
+  }
+
+  double _ease(double current, double next) => current + (next - current) * 0.18;
 }
 
 class _RobotEyesPainter extends CustomPainter {
-  const _RobotEyesPainter({required this.mood, required this.expression, required this.blink,
-    required this.gazeX, required this.gazeY, required this.audioLevel, required this.animation,
-    required this.particles});
+  const _RobotEyesPainter({required this.state, required this.blink,
+    required this.gazeX, required this.gazeY, required this.model});
 
-  final RobotMood mood;
-  final RobotExpression expression;
+  final RoboEyeState state;
   final bool blink;
   final double gazeX;
   final double gazeY;
-  final double audioLevel;
-  final double animation;
-  final List<_Particle> particles;
+  final _RoboEyesModel model;
 
   @override
   void paint(Canvas canvas, Size size) {
+    model.update(size, state, blink, gazeX, gazeY);
     final center = Offset(size.width / 2, size.height * 0.45);
-    final gap = size.width * 0.06;
-    final eyeWidth = math.min(size.width * 0.27, (size.width * 0.86 - gap) / 2);
-    final eyeHeight = size.height * 0.34 * (1 + audioLevel * 0.05);
-    final y = center.dy + gazeY * size.height * 0.04;
-    final gazeOffset = gazeX * size.width * 0.025;
-    final left = Offset(center.dx - gap / 2 - eyeWidth + gazeOffset, y - eyeHeight / 2);
-    final right = Offset(center.dx + gap / 2 + gazeOffset, y - eyeHeight / 2);
-    final pink = const Color(0xFFC44582);
-    final highlight = const Color(0xFFFF79B0);
-    final paint = Paint()..color = pink;
+    final eyeWidth = model.eyeLwidthCurrent;
+    final eyeHeight = model.eyeLheightCurrent;
+    final left = Offset(model.eyeLx, model.eyeLy);
+    final right = Offset(model.eyeRx, model.eyeRy);
+    final blue = const Color(0xFF42A5F5);
+    final highlight = const Color(0xFF9DDBFF);
+    final paint = Paint()..color = blue;
 
-    if (expression == RobotExpression.happy) {
+    if (state == RoboEyeState.happy) {
       _drawHappy(canvas, left, right, eyeWidth, eyeHeight, paint);
-    } else if (expression == RobotExpression.startled || expression == RobotExpression.sneeze) {
+    } else if (state == RoboEyeState.scared || state == RoboEyeState.scare) {
       _drawChevrons(canvas, center, eyeWidth, eyeHeight, paint);
     } else {
-      final lid = blink ? 0.95 : (mood == RobotMood.sleepy ? 0.48 : 0.06);
-      _drawEye(canvas, left, eyeWidth, eyeHeight * (1 - lid), paint, highlight);
-      _drawEye(canvas, right, eyeWidth, eyeHeight * (1 - lid), paint, highlight);
-    }
-    if (expression == RobotExpression.scan) {
-      final scanX = size.width * (0.25 + animation * 0.5);
-      canvas.drawRect(Rect.fromLTWH(scanX, center.dy - eyeHeight / 2, 2, eyeHeight), Paint()..color = highlight.withValues(alpha: 0.8));
-    }
-    if (expression == RobotExpression.hologram) _drawHologram(canvas, center.translate(0, eyeHeight * 0.9), size);
-    for (final particle in particles) {
-      final offset = Offset(particle.x * size.width, particle.y * size.height - animation * 12);
-      canvas.drawCircle(offset, 2.5, Paint()..color = pink.withValues(alpha: 0.7));
+      final lid = blink ? 0.95 : (state == RoboEyeState.sleepy ? 0.48 : 0.06);
+      _drawEye(canvas, left, model.eyeLwidthCurrent, eyeHeight * (1 - lid), model.eyeLborderRadiusCurrent, paint, highlight);
+      _drawEye(canvas, right, model.eyeRwidthCurrent, model.eyeRheightCurrent * (1 - lid), model.eyeRborderRadiusCurrent, paint, highlight);
     }
   }
 
-  void _drawEye(Canvas canvas, Offset topLeft, double width, double height, Paint paint, Color highlight) {
-    final rect = RRect.fromRectAndRadius(Rect.fromLTWH(topLeft.dx, topLeft.dy + (height * 0.34), width, height), const Radius.circular(28));
+  void _drawEye(Canvas canvas, Offset topLeft, double width, double height, double radius, Paint paint, Color highlight) {
+    final rect = RRect.fromRectAndRadius(Rect.fromLTWH(topLeft.dx, topLeft.dy, width, height), Radius.circular(radius));
     canvas.drawRRect(rect, paint);
     canvas.drawRRect(RRect.fromRectAndRadius(rect.outerRect.deflate(width * 0.07), const Radius.circular(22)), Paint()..color = highlight.withValues(alpha: 0.28));
   }
@@ -244,14 +331,6 @@ class _RobotEyesPainter extends CustomPainter {
       canvas.drawPath(path, paint);
     }
     paint.style = PaintingStyle.fill;
-  }
-
-  void _drawHologram(Canvas canvas, Offset center, Size size) {
-    final paint = Paint()..color = const Color(0xCCF2F2F2)..style = PaintingStyle.stroke..strokeWidth = 1.5;
-    final rect = Rect.fromCenter(center: center, width: size.width * 0.08, height: size.height * 0.045);
-    canvas.drawRect(rect, paint);
-    canvas.drawLine(rect.topLeft, rect.bottomLeft.translate(0, -rect.height * 0.8), paint);
-    canvas.drawLine(rect.topRight, rect.bottomRight.translate(0, -rect.height * 0.8), paint);
   }
 
   @override

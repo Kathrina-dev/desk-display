@@ -63,6 +63,7 @@ class _StandScreenState extends State<StandScreen> {
       onPopInvokedWithResult: (didPop, result) {},
       child: Scaffold(
         body: PageView(
+          scrollDirection: Axis.vertical,
           children: [
             _ClockPage(seconds: _timer.elapsedSeconds, onEmergencyExit: _exitStand),
             const RobotEyes(),
