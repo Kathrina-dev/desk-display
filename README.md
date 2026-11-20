@@ -52,8 +52,8 @@ Rendered with custom vector shaders and CRT scanline effects, Gippy has a wide r
   </tr>
   <tr>
     <td align="center" width="50%">
-      <img src="screenshots/gippy_coffee.jpeg" width="100%" alt="Gippy Coffee & Skeptical" /><br />
-      <b>☕ Coffee Break & Skeptical Glance</b><br />
+      <img src="screenshots/gippy_coffee.jpg" width="100%" alt="Gippy Coffee & Skeptical" /><br />
+      <b>☕ Coffee Break</b><br />
       <i>Glances down at a holographic coffee mug during idle work hours.</i>
     </td>
     <td align="center" width="50%">
